@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>OmniNow · Configurar TV</title>
+<style>
+  :root { --bg: #04060b; --card: #0f1420; --line: rgba(255,255,255,.1); --text: #f1f4fa; --dim: #8b94a8; --acc: #6d7cff; --acc2: #a855f7; --ok: #22c55e; --err: #f87171; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: radial-gradient(120% 60% at 50% 0%, #121a33 0%, var(--bg) 60%); color: var(--text);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 460px; margin: 0 auto; padding: 28px 16px 40px; }
+  .logo { display: block; width: 190px; margin: 0 auto 18px; }
+  h1 { font-size: 21px; margin: 0 0 6px; text-align: center; }
+  p.sub { margin: 0 0 22px; text-align: center; color: var(--dim); font-size: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
+  .tabs { display: flex; background: rgba(255,255,255,.05); border-radius: 12px; padding: 4px; margin-bottom: 18px; }
+  .tabs button { flex: 1; border: 0; background: none; color: var(--dim); font: inherit; font-weight: 700; padding: 10px; border-radius: 9px; }
+  .tabs button.on { background: linear-gradient(90deg, var(--acc), var(--acc2)); color: #fff; }
+  label { display: block; font-size: 13px; color: var(--dim); margin: 12px 0 6px; font-weight: 600; }
+  input { width: 100%; padding: 13px 14px; border-radius: 11px; border: 1px solid var(--line); background: #0a0e17; color: var(--text); font: inherit; font-size: 16px; }
+  input:focus { outline: 2px solid var(--acc); border-color: transparent; }
+  .hint { font-size: 12px; color: var(--dim); margin-top: 5px; }
+  .send { width: 100%; margin-top: 22px; padding: 15px; border: 0; border-radius: 13px; font: inherit; font-weight: 800; font-size: 17px; color: #fff;
+    background: linear-gradient(90deg, var(--acc), var(--acc2)); }
+  .send:disabled { opacity: .6; }
+  .msg { margin-top: 16px; padding: 14px; border-radius: 12px; font-size: 15px; display: none; }
+  .msg.show { display: block; }
+  .msg.ok { background: rgba(34,197,94,.14); border: 1px solid rgba(34,197,94,.4); }
+  .msg.err { background: rgba(248,113,113,.12); border: 1px solid rgba(248,113,113,.4); }
+  .msg.wait { background: rgba(109,124,255,.12); border: 1px solid rgba(109,124,255,.4); }
+  .lock { margin-top: 18px; font-size: 12px; color: var(--dim); text-align: center; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <img class="logo" src="logo.png" alt="OmniNow">
+  <h1>Configurar a lista na TV</h1>
+  <p class="sub">Preencha aqui no celular e toque em Enviar. A TV recebe na hora.</p>
+
+  <div class="card" id="form">
+    <div class="tabs"><button type="button" class="on" data-t="xtream">Xtream Codes</button><button type="button" data-t="m3u">Link M3U</button></div>
+    <div id="fx">
+      <label for="server">Endereço do servidor</label>
+      <input id="server" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="http://servidor.com:8080">
+      <div class="hint">Vem no e-mail ou mensagem do seu provedor (às vezes chamado de "URL" ou "host").</div>
+      <label for="user">Usuário</label>
+      <input id="user" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="username">
+      <label for="pass">Senha</label>
+      <input id="pass" type="password" autocomplete="current-password">
+    </div>
+    <div id="fm" hidden>
+      <label for="url">Link da lista M3U</label>
+      <input id="url" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="http://...">
+      <div class="hint">Se o link tiver username= e password=, prefira a aba Xtream Codes: a TV mostra capas e temporadas.</div>
+    </div>
+    <button class="send" id="send" type="button">Enviar para a TV</button>
+    <div class="msg" id="msg"></div>
+    <div class="lock">🔒 Os dados vão criptografados direto para a sua TV. Nada fica guardado nesta página.</div>
+  </div>
+  <div class="card" id="nolink" hidden>
+    <p style="margin:0">Abra esta página pelo <b>QR Code que aparece na TV</b> (OmniNow → Configurar pelo celular).</p>
+  </div>
+</main>
+<script src="paircrypto.js"></script>
+<script>
+(function () {
+  'use strict';
+  var NTFY = 'https://ntfy.sh/';
+  var m = /^#(omninow-[0-9a-f]{20})\.([0-9a-f]{32})$/.exec(location.hash);
+  if (!m) { document.getElementById('form').hidden = true; document.getElementById('nolink').hidden = false; return; }
+  var topic = m[1], key = m[2], tab = 'xtream';
+  var $ = function (id) { return document.getElementById(id); };
+
+  // m3u com usuário e senha no link: já preenche o Xtream
+  function fromLink(u) {
+    var x = /^(https?:\/\/[^\/?#]+).*[?&]username=([^&]+).*[?&]password=([^&]+)/i.exec(u);
+    return x ? { server: x[1], user: decodeURIComponent(x[2]), pass: decodeURIComponent(x[3]) } : null;
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (b) {
+    b.addEventListener('click', function () {
+      tab = b.getAttribute('data-t');
+      Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (x) { x.className = x === b ? 'on' : ''; });
+      $('fx').hidden = tab !== 'xtream';
+      $('fm').hidden = tab !== 'm3u';
+    });
+  });
+
+  function say(cls, text) { var e = $('msg'); e.className = 'msg show ' + cls; e.innerHTML = text; }
+
+  function withHttp(s) { s = s.trim(); return /^https?:\/\//i.test(s) ? s : 'http://' + s; }
+
+  $('send').addEventListener('click', function () {
+    var data;
+    if (tab === 'xtream') {
+      var server = $('server').value.trim(), link = fromLink(server);
+      if (link) { $('server').value = link.server; $('user').value = $('user').value || link.user; $('pass').value = $('pass').value || link.pass; server = link.server; }
+      if (!server || !$('user').value.trim()) { say('err', 'Preencha o endereço do servidor e o usuário.'); return; }
+      data = { type: 'xtream', server: withHttp(server).replace(/\/+$/, ''), user: $('user').value.trim(), pass: $('pass').value };
+    } else {
+      var u = $('url').value.trim();
+      if (!u) { say('err', 'Cole o link da lista.'); return; }
+      data = { type: 'm3u', url: withHttp(u) };
+    }
+    $('send').disabled = true;
+    say('wait', 'Enviando para a TV…');
+    var since = Math.floor(Date.now() / 1000) - 2;
+    var x = new XMLHttpRequest();
+    x.open('POST', NTFY + topic, true);
+    x.onload = function () {
+      if (x.status >= 300) { fail(); return; }
+      say('wait', 'Enviado! Esperando a TV confirmar…');
+      waitAck(since, Date.now() + 60000);
+    };
+    x.onerror = fail;
+    x.send(PairCrypto.seal(key, JSON.stringify(data)));
+  });
+
+  function fail() { $('send').disabled = false; say('err', 'Não consegui enviar. Confira a internet do celular e tente de novo.'); }
+
+  // espera o "ok" da TV numa conexão só (o ntfy manda assim que chega)
+  function waitAck(since, until) {
+    var x = new XMLHttpRequest(), seen = 0, got = false;
+    var stop = setTimeout(function () {
+      if (got) return;
+      try { x.abort(); } catch (e) {}
+      $('send').disabled = false;
+      say('err', 'A TV não respondeu. Confira se o QR Code ainda está aberto na TV e toque em Enviar de novo.');
+    }, until - Date.now());
+    x.open('GET', NTFY + topic + 'a/json?since=' + since + '&r=' + Date.now(), true);
+    x.onprogress = function () {
+      var t = x.responseText || '', end = t.lastIndexOf('\n');
+      if (end < seen) return;
+      t.slice(seen, end).split('\n').forEach(function (l) {
+        try { var e = JSON.parse(l); if (e.event === 'message' && PairCrypto.open(key, e.message) === 'ok') got = true; } catch (err) {}
+      });
+      seen = end + 1;
+      if (got) {
+        clearTimeout(stop);
+        try { x.abort(); } catch (e) {}
+        say('ok', '<b>Pronto!</b> A TV recebeu a lista e já está carregando os canais. Pode fechar esta página.');
+      }
+    };
+    x.onerror = function () { if (!got && Date.now() < until) setTimeout(function () { clearTimeout(stop); waitAck(since, until); }, 3000); };
+    x.send();
+  }
+})();
+</script>
+</body>
+</html>
