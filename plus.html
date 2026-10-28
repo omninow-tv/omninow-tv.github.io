@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>MavieNow Plus</title>
+<style>
+  :root { --bg: #04060b; --card: #0f1420; --line: rgba(255,255,255,.1); --text: #f1f4fa; --dim: #8b94a8; --acc: #6d7cff; --acc2: #a855f7; --ok: #22c55e; --err: #f87171; --gold: #fbbf24; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; background: radial-gradient(120% 60% at 50% 0%, #121a33 0%, var(--bg) 60%); color: var(--text);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 460px; margin: 0 auto; padding: 28px 16px 40px; }
+  .logo { display: block; width: 170px; margin: 0 auto 16px; }
+  h1 { font-size: 22px; margin: 0 0 6px; text-align: center; }
+  p.sub { margin: 0 0 20px; text-align: center; color: var(--dim); font-size: 14px; }
+  .plan { display: block; width: 100%; text-align: left; background: var(--card); border: 2px solid var(--line); border-radius: 18px; padding: 16px 18px;
+    margin-bottom: 12px; color: var(--text); font: inherit; cursor: pointer; }
+  .plan.best { border-color: var(--acc); }
+  .plan b { font-size: 18px; }
+  .plan .price { float: right; font-size: 20px; font-weight: 800; }
+  .plan small { display: block; color: var(--dim); margin-top: 4px; font-size: 13px; }
+  .tag { display: inline-block; background: linear-gradient(90deg, var(--acc), var(--acc2)); color: #fff; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 6px; margin-left: 6px; vertical-align: 2px; }
+  ul.feat { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 18px 14px 36px; margin: 18px 0; color: #d7dceb; font-size: 14px; }
+  ul.feat li { margin: 4px 0; }
+  .msg { margin: 14px 0; padding: 14px; border-radius: 12px; font-size: 15px; display: none; }
+  .msg.show { display: block; }
+  .msg.ok { background: rgba(34,197,94,.14); border: 1px solid rgba(34,197,94,.4); }
+  .msg.err { background: rgba(248,113,113,.12); border: 1px solid rgba(248,113,113,.4); }
+  .msg.wait { background: rgba(109,124,255,.12); border: 1px solid rgba(109,124,255,.4); }
+  .foot { font-size: 12px; color: var(--dim); text-align: center; line-height: 1.6; }
+  .foot a { color: var(--dim); }
+  button:disabled { opacity: .6; }
+</style>
+</head>
+<body>
+<main>
+  <img class="logo" src="logo.png" alt="MavieNow">
+  <h1>MavieNow Plus</h1>
+  <p class="sub">Para a TV <b id="tv">—</b> · pagamento único, sem renovação automática</p>
+
+  <div id="msg" class="msg"></div>
+
+  <div id="plans">
+    <button class="plan" data-plan="annual"><span class="price">R$ 19,90</span><b>1 ano</b><small>Libera o Plus por 12 meses nesta TV</small></button>
+    <button class="plan best" data-plan="lifetime"><span class="price">R$ 39,90</span><b>Vitalício</b><span class="tag">MELHOR VALOR</span><small>Paga uma vez e é seu para sempre nesta TV</small></button>
+  </div>
+
+  <ul class="feat">
+    <li>Guia de programação dos canais</li>
+    <li>FUTEBOL completo: escudos, Meus times, avisos de gol, lances, escalações e tabela</li>
+    <li>Narração em português escolhida automaticamente</li>
+    <li>Qualidade automática quando a internet oscila</li>
+    <li>Legendas automáticas, timer de desligar e organizar pastas</li>
+  </ul>
+
+  <p class="foot">Pix ou cartão pelo Mercado Pago. Depois de pago, a TV libera sozinha em alguns segundos.<br>
+    Arrependimento: até 7 dias após a compra, pelo e-mail <a href="mailto:scamautopsy07@gmail.com">scamautopsy07@gmail.com</a>.<br>
+    <a href="termos.html">Termos de uso e privacidade</a></p>
+</main>
+<script>
+(function () {
+  'use strict';
+  var API = 'https://mavienow-licencas.mavienow.workers.dev';
+  var m = /#d=([0-9a-f]{32})/.exec(location.hash), d = m && m[1];
+  var msg = document.getElementById('msg'), q = location.search;
+  function show(cls, html) { msg.className = 'msg show ' + cls; msg.innerHTML = html; }
+  if (!d) {
+    document.getElementById('plans').hidden = true;
+    show('err', 'Abra esta página pelo <b>QR Code da TV</b> (MavieNow → Configurações → MavieNow Plus).');
+    return;
+  }
+  document.getElementById('tv').textContent = d.slice(0, 8).toUpperCase();
+  if (/ok=1/.test(q)) show('ok', '<b>Pagamento aprovado!</b> A TV libera o Plus sozinha em alguns segundos. Pode fechar esta página.');
+  else if (/pend=1/.test(q)) show('wait', '<b>Pagamento em análise.</b> Assim que o Mercado Pago aprovar, a TV libera sozinha.');
+  else if (/err=1/.test(q)) show('err', 'O pagamento não foi concluído. Você pode tentar de novo.');
+
+  var busy = false;
+  Array.prototype.forEach.call(document.querySelectorAll('[data-plan]'), function (b) {
+    b.onclick = function () {
+      if (busy) return;
+      busy = true;
+      var all = document.querySelectorAll('[data-plan]');
+      Array.prototype.forEach.call(all, function (x) { x.disabled = true; });
+      show('wait', 'Abrindo o Mercado Pago…');
+      fetch(API + '/v1/checkout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ d: d, plan: b.getAttribute('data-plan') }) })
+        .then(function (r) { return r.json(); })
+        .then(function (j) { if (!j.url) throw new Error(j.error || 'sem link'); location.href = j.url; })
+        .catch(function () {
+          busy = false;
+          Array.prototype.forEach.call(all, function (x) { x.disabled = false; });
+          show('err', 'Não consegui abrir o pagamento agora. Confira a internet e tente de novo.');
+        });
+    };
+  });
+})();
+</script>
+</body>
+</html>
